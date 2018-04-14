@@ -1,35 +1,41 @@
 package simplelb
 
-import "container/heap"
+import (
+	"container/heap"
+	"fmt"
+)
 
 type Balancer struct {
 	pool Pool
 	done chan *Worker
 }
 
-func New(workerCount int) {
+func NewBalancer(workerCount int) Balancer {
 	b := Balancer{
 		pool: NewPool(workerCount),
 		done: make(chan *Worker),
 	}
 
 	for i := 0; i < workerCount; i++ {
-		w := NewWorker()
+		w := NewWorker(fmt.Sprintf("Worker<%v>", i + 1))
 		w.work(b.done)
 		b.pool = append(b.pool, w)
 	}
-
+	return b
 }
 
-func (b *Balancer) balance(requests chan Request) {
-	for {
-		select {
-		case req := <-requests:
-			b.dispatch(req)
-		case w := <-b.done:
-			b.complete(w)
+func (b *Balancer) Balance(requests chan Request) {
+	go func() {
+		for {
+			select {
+			case req := <-requests:
+				b.dispatch(req)
+			case w := <-b.done:
+				b.complete(w)
+			}
 		}
-	}
+	}()
+
 }
 
 func (b *Balancer) dispatch(req Request) {
@@ -38,9 +44,13 @@ func (b *Balancer) dispatch(req Request) {
 	// send task to it
 	w.requests <- req
 
+	fmt.Printf("%v dispatched to %v \n", req.Name, w.name)
+
 	w.pending++
 
 	heap.Push(&b.pool, w)
+
+	b.pool.printWorkerLoad()
 
 }
 

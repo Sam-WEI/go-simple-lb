@@ -1,6 +1,7 @@
 package simplelb
 
 type Request struct {
-	fn    func() int
-	doneC chan int
+	Name string
+	Fn   func() int
+	Done chan int
 }
